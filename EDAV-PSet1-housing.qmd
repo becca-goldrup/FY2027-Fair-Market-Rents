@@ -1,0 +1,189 @@
+---
+title: "PSet 1: The Price of Housing"
+author: "Becca Goldrup"
+date: "10/11/2026"
+format: html
+editor: visual
+---
+
+## PSet 1: The Price of Housing
+
+## My work
+
+### Understanding the data
+
+- Variables:
+
+  - **fips** (code describing state, county, and county subdivision), **stups** (state postal code)
+
+  - **state** (2 digit state code), **countyname** (county name), **county_town_name** (Town Name for areas in New England)
+
+  - **hud_area_code** (HUD-assigned identification number for FMR areas), hud_area_name (name of area)
+
+  - **metro** (1= metropolitan statistical area area, 0 = not),
+
+  - **pop2024** (population in 2024)
+
+  - **bedrooms** (# of bedrooms)
+
+  - **fmr** (fair market rent)
+
+  - Further description
+
+    - Fair Market Rents
+
+      - Cost of shelter (rental payment agreed to in lease) + utilities (regardless of who pays)
+
+      - Used to determine
+
+        - payment standard amounts for Section 8 housing choice voucher program
+
+        - public housing flat rents
+
+        - renewal funding inflation factor calculations
+
+        - rent ceilings (for HOME rental assistance program, Emergency Solutions Grants program)
+
+        - input for other formulas (e.g. HUD's calculation of very-low income limits)
+
+    - Metropolitan
+
+      - Based on core-based statistical areas
+
+      - Before 2000, metro areas based on towns - this distinction has remained for town-based metro area definitions in New England
+
+- Data collection
+
+  - Collected by HUD (department of Housing and Urban Development)
+
+  - FMRs used within variety of housing assistance programs, representing HUD's best estimate of the 40th percentile of rents paid by recent movers with various housing markets
+
+  - Process
+
+    - Uses data from the U.S. Census Bureau’s American Community Survey (ACS)
+
+    - Area Rent surveys
+
+      - Sample of telephone numbers / addresses surveyed
+
+      - Mail surveys
+
+    - Focus on recent movers (to reflect current pricing)
+
+    - Adjust figures for inflation
+
+- Each row gives Fair Market Rent (for fiscal year 2027) for a particular county/county equivalent/New England town, by number of bedrooms.
+
+  - HUD estimates FMR for whole hud area, not for counties within area
+
+- Observations from code
+
+### Code
+
+```{r, echo=FALSE}
+# load packages
+library(tidyverse)
+library(ggplot2)
+library(dplyr)
+
+# read in data
+df <- read.csv("data/fmr2027.csv")
+
+# data clean up
+df <- rename(df, stusps = state, state = stusps)
+
+df$metro <- factor(df$metro, 
+              levels = c(0, 1), 
+              labels = c("non-metro", "metro"))
+
+# view data
+head(df)
+
+# 2 bedrooms as a "standard" rental size
+two_bedrooms <- filter(df, bedrooms == 2)
+```
+
+```{r, echo=FALSE}
+ggplot(distinct(df, fips, pop2024), mapping = aes(x = pop2024)) + 
+  geom_histogram(bins = 40) + 
+  scale_x_continuous(labels = scales::comma) + 
+  labs(caption = "Figure 1")
+# DISTRIBUTION COUNTY POPULATION SIZES
+```
+
+```{r, echo=FALSE}
+ggplot(data = two_bedrooms, mapping = aes(fmr)) + 
+  geom_histogram()  + 
+  labs(caption = "Figure 2")
+# DISTRIBUTION 2 BEDROOM RENTS
+```
+
+```{r, echo=FALSE}
+ggplot(data = df, aes(x = factor(bedrooms), y = fmr, fill = metro)) +
+  geom_boxplot() +
+  labs(caption = "Figure 3")
+#DISTRIBUTION FMR PER BEDROOM, METRO VS. NON-METRO
+```
+
+```{r, echo=FALSE}
+ggplot(data = df, mapping = aes(x = pop2024, y = fmr, color = metro)) +
+    geom_point(alpha = 0.3) +
+    scale_y_continuous(labels = scales::dollar)  +
+    scale_x_continuous(labels = scales::comma) +
+    labs(caption = "Figure 4")
+# POPULATION VS. FMR, METRO VS. NON-METRO
+```
+
+```{r, echo=FALSE}
+#| fig-height: 9
+ggplot(two_bedrooms, 
+       aes(x = fmr, y = reorder(state, fmr, FUN = median))) +
+  geom_boxplot() +
+  labs(caption = "Figure 5")
+# BOXPLOT 2BR FMR BY STATE
+```
+
+```{r, echo=FALSE}
+#| fig-height: 9
+two_bedrooms <- filter(df, bedrooms == 2)
+by_state <- group_by(two_bedrooms, state, metro)
+state_medians <- summarize(by_state, twoBR_median_fmr = median(fmr, na.rm = TRUE))
+
+ggplot(state_medians, 
+       aes(x = twoBR_median_fmr, 
+           y = reorder(state, twoBR_median_fmr), 
+          color = metro)) +
+  geom_point() +
+  labs(caption = "Figure 6")
+
+# MEDIAN 2BR FMR BY STATE, METRO VS. NONMETRO
+```
+
+```{r, echo=FALSE}
+#| fig-height: 9
+state_counts <- count(two_bedrooms, state)
+ggplot(state_counts, aes(x = n, y = reorder(state, n))) +
+  geom_point() +
+  labs(caption = "Figure 7")
+# COUNTIES PER STATE
+```
+
+```{r, echo=FALSE}
+hud_area_counts <- count(two_bedrooms, hud_area_code)
+
+ggplot(hud_area_counts, aes(x = n)) +
+  geom_bar() +
+  labs(caption = "Figure 8")
+# COUNTIES PER HUD AREA
+```
+
+```{r, echo=FALSE}
+four_bedrooms <- filter(df, bedrooms == 4)
+four_only <-  dplyr::select(four_bedrooms, fips, fmr_4 = fmr)
+both <- inner_join(two_bedrooms, four_only, by = "fips")
+
+ggplot(data = both, aes(x=fmr, y=fmr_4, color = metro)) +
+  geom_point(alpha = .3) +
+  labs(caption = "Figure 9")
+# FMR 2 BEDROOM VS 4 BEDROOM
+```
