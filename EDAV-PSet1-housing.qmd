@@ -2,7 +2,9 @@
 title: "PSet 1: The Price of Housing"
 author: "Becca Goldrup"
 date: "10/11/2026"
-format: html
+format:
+  html:
+    output-file: index.html
 editor: visual
 ---
 
